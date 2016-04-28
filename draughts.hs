@@ -1,26 +1,38 @@
+import Data.List
+
 data Figure = Black | White | BlackKing | WhiteKing
 data Field = Field (Maybe Figure)
 type BoardLine = [Field]
 type Board = [BoardLine]
 
-instance Show Figure where
-  show (Black) = "b"
-  show (White) = "w"
-  show (BlackKing) = "B"
-  show (WhiteKing) = "W"
+prepend c x = [c, x]
+append c x = [x, c]
 
-instance (Show Field) where
-  show (Field Nothing) = "."
-  show (Field (Just figure)) = show figure
+indiceList l =
+  zip [1 ..] l
 
-prefixDot x = "." ++ x
-postfixDot x = x ++ "."
+showFigure Black = 'b'
+showFigure White = 'w'
+showFigure BlackKing = 'B'
+showFigure WhiteKing = 'W'
 
-serializeBoardLine boardLine lineNumber =
-  concat (map fillFunc lineString)
-  where lineString = map show boardLine
-        fillFunc = (if even lineNumber then prefixDot else postfixDot)
+showField (Field Nothing) = '.'
+showField (Field (Just figure)) = showFigure figure
 
-exampleBoard = [
-  [Field (Just Black), Field Nothing, Field (Just WhiteKing), Field (Just BlackKing)],
-  [Field Nothing, Field Nothing, Field (Just White), Field (Just Black)]]
+showBoardLine pad line =
+  concat (map (pad . showField) line)
+
+mapOddEven evenf oddf l =
+  map (\x -> let num = fst x
+                 elem = snd x
+             in if even num
+                then evenf elem
+                else oddf elem) (indiceList l)
+
+showBoard pad board =
+  unlines (mapOddEven (showBoardLine (append pad)) (showBoardLine (prepend pad)) board)
+  
+exampleBoard =
+  [[Field (Just Black), Field Nothing, Field (Just WhiteKing), Field (Just BlackKing)],
+   [Field Nothing, Field Nothing, Field (Just White), Field (Just Black)],
+   [Field Nothing, Field Nothing, Field (Just White), Field (Just Black)]]
