@@ -1,4 +1,4 @@
-module PrettyBoard (prettyShowBoard) where
+module PrettyBoard (showBoardPretty) where
 import Board
 
 genColCaption :: String
@@ -11,7 +11,7 @@ genRowCaptions =
 addRowCaptions :: [String] -> [String]
 addRowCaptions strList =
   let captionedRows = zip genRowCaptions strList
-  in map (\(caption, line) -> caption ++ " " ++ line) captionedRows
+  in map (\(cap, line) -> cap ++ " " ++ line ++ " " ++ cap) captionedRows
 
 addColCaptions :: [String] -> [String]
 addColCaptions strList =
@@ -22,6 +22,6 @@ addCaptions :: [String] -> [String]
 addCaptions strList =
   (addColCaptions . addRowCaptions) strList
 
-prettyShowBoard :: Board b => b -> String
-prettyShowBoard board =
+showBoardPretty :: Board b => b -> String
+showBoardPretty board =
   unlines ((addCaptions . showLines) board)
