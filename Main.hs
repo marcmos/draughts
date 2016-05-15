@@ -1,21 +1,26 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Main where
 import Board
+import Field
+import PrettyBoard
 
--- TODO:
--- implement board using hash table
--- use DataTree in min-max algorithm
+exampleBoardStr :: String
+exampleBoardStr = unlines
+  [".b.b.b.b",
+   "b.b.b.b.",
+   ".b.b.b.b",
+   "........",
+   "........",
+   "w.w.w.w.",
+   ".w.w.w.w",
+   "w.w.w.w."]
 
-exampleBoardStr =
-  ".b.b.b.b\n" ++
-  "b.b.b.b.\n" ++
-  ".b.b.b.b\n" ++
-  "........\n" ++
-  "........\n" ++
-  "w.w.w.w.\n" ++
-  ".w.w.w.w\n" ++
-  "w.w.w.w."
+readListBoard :: Board [[Field]] => String -> [[Field]]
+readListBoard = readBoard
 
-exampleBoard = readBoard exampleBoardStr
+exampleBoard :: [[Field]]
+exampleBoard = readListBoard exampleBoardStr
 
+main :: IO ()
 main =
   return ()

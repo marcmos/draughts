@@ -1,69 +1,76 @@
-module Board where
+{-# LANGUAGE FlexibleInstances #-}
+module Board (BoardPosition, Board (..), isPosInBoard, removeFigure,
+              showBoard) where
 import Field
+import Figure
 import Utils
 
-type BoardLine = [Field]
-type Board = [BoardLine]
-
-type BoardColumn = Int          -- TODO: own Ord type?
+type BoardColumn = Int
 type BoardRow = Int
-type BoardPosition = (BoardColumn, BoardRow)
+type BoardPosition = (BoardRow, BoardColumn)
 
-getBoardSize board = length board
+class Board a where
+  size :: a -> Int
+  getField :: a -> BoardPosition -> Maybe Field
+  setFigure :: a -> BoardPosition -> Maybe Figure -> Maybe a
+  readBoard :: String -> a
+  showLines :: a -> [String]
+  moveFigure :: a -> BoardPosition -> BoardPosition -> Maybe a
 
-getBottomLine = "  12345678"
+isPosInBoard :: Board a => a -> BoardPosition -> Bool
+isPosInBoard board (row, col) =
+    row > 0 && row <= (size board) &&
+    col > 0 && col <= (size board) &&
+    odd row /= odd col
 
-showBoardLine pad line =
-  concat (map (pad . showField) line)
+removeFigure :: Board a => a -> BoardPosition -> Maybe a
+removeFigure = (\board pos -> setFigure board pos Nothing)
 
-showBoard pad board =
-  let rows = mapOddEven
-        (showBoardLine (append pad))
-        (showBoardLine (prepend pad)) board
-  in unlines ((addAnnotations rows) ++ [getBottomLine])
+showBoard :: Board a => a -> String
+showBoard board = (unlines . showLines) board
 
+instance Board [[Field]] where
+  size a = length a
+
+  getField board pos = do
+    (col, row) <- remapPos board pos
+    return (board !! col !! row)
+
+  setFigure board pos figure = do
+    (row, col) <- remapPos board pos
+    return (replaceNth row board (replaceNth col (board !! row) (Field figure)))
+
+  readBoard s = mapOddEven (readBoardLine odd) (readBoardLine even) (lines s)
+
+  showLines board =
+    let padChar = '.'
+    in mapOddEven
+       (showBoardLine (append padChar))
+       (showBoardLine (prepend padChar)) board
+
+  moveFigure board initPos finalPos = do
+    Field figure <- getField board initPos
+    board1 <- setFigure board finalPos figure
+    board2 <- removeFigure board1 initPos
+    return board2
+
+readBoardLine :: (Int -> Bool) -> String -> [Field]
 readBoardLine parity str =
   map readField (every parity str)
 
-readBoard str =
-  mapOddEven (readBoardLine odd) (readBoardLine even) (lines str)
+showBoardLine :: (Char -> String) -> [Field] -> String
+showBoardLine pad line =
+  concat (map (pad . showField) line)
 
-generateRowAnnotations =
-  [show num | num <- [1 ..]]
+remapPos :: [[Field]] -> BoardPosition -> Maybe BoardPosition
+remapPos board (row, col) =
+  let mappedRow = row - 1
+      mappedCol = if odd row then col `quot` 2 - 1 else col `quot` 2
+      mappedPos = (mappedRow, mappedCol)
+  in if isPosInBoard board (row, col)
+     then Just mappedPos
+     else Nothing
 
-addAnnotations board =
-  let countedRows = zip generateRowAnnotations board
-  in map (\x -> (fst x) ++ " " ++ (snd x)) countedRows
-
-isInBoard size (col, row) =
-  col >= 0 && row >= 0 && col < size && row < size
-
--- UNUSED
+-- BoardPosition generator
 -- genPos rows = [(c, d) | c <- [1..8], d <- rows, or [and [even c, even d],
 --                                                     and [odd c, odd d]]]
-
-replaceRowWith line pos figure =
-  replaceNth line pos (Field figure)
-
-boardApplyAt board (col, row) f =
-  replaceNth board row (f (board !! row) col)
-
-removeRowFigure line pos =
-  replaceRowWith line pos Nothing
-removeFigure board (col, row) =
-  boardApplyAt board (col, row) removeRowFigure
-
-replaceRowFigure line pos figure =
-  replaceRowWith line pos (Just figure)
-replaceFigure board (col, row) figure =
-  boardApplyAt board (col, row) (\line pos -> replaceRowFigure line pos figure)
-
-getField board (col, row) =
-  board !! row !! col
-
--- filtering
-filterInBoard size moves =
-  filter (isInBoard size) moves
-
-filterOccupied board posList =
-  filter (\x -> getField board x /= Field Nothing) posList
