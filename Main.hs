@@ -2,7 +2,11 @@
 module Main where
 import Board
 import Field
+
+-- for interactive use
+import Figure
 import PrettyBoard
+import Move
 
 exampleBoardStr :: String
 exampleBoardStr = unlines

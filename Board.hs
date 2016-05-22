@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
-module Board (BoardPosition, Board (..), isPosInBoard, removeFigure,
-              showBoard) where
+module Board (BoardPosition, BoardField, Board (..), isPosInBoard,
+              removeFigure, getDistance, showBoard) where
+import Data.Maybe
+
 import Field
 import Figure
 import Utils
@@ -8,6 +10,8 @@ import Utils
 type BoardColumn = Int
 type BoardRow = Int
 type BoardPosition = (BoardRow, BoardColumn)
+
+type BoardField = (BoardPosition, Field)
 
 class Board a where
   size :: a -> Int
@@ -28,6 +32,12 @@ removeFigure = (\board pos -> setFigure board pos Nothing)
 
 showBoard :: Board a => a -> String
 showBoard board = (unlines . showLines) board
+
+getDistance :: BoardPosition -> BoardPosition -> Maybe Int
+getDistance (fstRow, fstCol) (sndRow, sndCol) =
+  let rowDist = abs $ fstRow - sndRow
+      colDist = abs $ fstCol - sndCol
+  in if rowDist == colDist then Just rowDist else Nothing
 
 instance Board [[Field]] where
   size a = length a
