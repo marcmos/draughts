@@ -1,92 +1,145 @@
 module Move where
+
 import Data.Maybe
+
 import Board
-import Figure
 import Field
+import Figure
 
--- -----------------------------------------------------------------------------
--- Move generation
+data Diagonals t = Diagonals {
+  left :: t,
+  right :: t
+  } deriving Show
 
--- generates only positions, without knowledge of board size
--- ,,forward'' and ,,backward'' for these functions is meant in white's POV
+instance Functor Diagonals where
+  fmap f diag =
+    Diagonals {left = f (left diag),
+               right = f (right diag)}
 
--- range constraint in single step
-getMoveRange :: Board t => t -> FigureType -> Int
-getMoveRange _ Pawn = 2
-getMoveRange board King = size board
+data Neighborhood t = Neighborhood {
+  origin :: BoardFigure,
+  forward :: Diagonals t,
+  backward :: Diagonals t
+  } deriving Show
 
--- FIXME: write type
--- genSpectralMove (a, b) radius rowOp colOp =
---   [(rowOp a x, colOp b x) | x <- [1 .. radius]]
+instance Functor Neighborhood where
+  fmap f n =
+    Neighborhood {origin = origin n,
+                  forward = fmap f $ forward n,
+                  backward = fmap f $ backward n}
 
-isSpectralMove :: BoardPosition -> BoardPosition -> Bool
-isSpectralMove (origRow, origCol) (row, col) =
-  abs (origRow - row) == abs (origCol - col)
+figureRange :: Board t => t -> FigureType -> Int
+figureRange _ Pawn = 2
+figureRange board King = size board
 
--- genForwardMoves :: Int -> BoardPosition -> [[BoardPosition]]
--- genForwardMoves radius (a, b) =
---   let forwardRowMove = genSpectralMove (a, b) radius (-)
---   in [forwardRowMove (-), forwardRowMove (+)]
+diagonalPositions :: BoardPosition -> Int -> (BoardRow -> BoardRow -> BoardRow)
+                  -> (BoardColumn -> BoardColumn -> BoardColumn) ->
+                     [BoardPosition]
+diagonalPositions (a, b) radius rowOp colOp =
+  [(rowOp a x, colOp b x) | x <- [1 .. radius]]
 
--- genBackwardMoves :: Int -> BoardPosition -> [[BoardPosition]]
--- genBackwardMoves radius (a, b) =
---   let backwardRowMove = genSpectralMove (a, b) radius (+)
---   in [backwardRowMove (-), backwardRowMove (+)]
+forwardPositions :: Int -> BoardPosition -> Diagonals [BoardPosition]
+forwardPositions radius (a, b) =
+  let diagMovesForward = diagonalPositions (a, b) radius (-)
+  in Diagonals {left = diagMovesForward (-),
+                right = diagMovesForward (+)}
 
--- returned directions are ,,color directed''; first list is move ,,forward''
--- in means for given color, second is ,,backward''
--- genSpectralMoves :: Int -> FigureColor -> BoardPosition -> [[[BoardPosition]]]
--- genSpectralMoves radius color (a, b) =
---   let whiteForwardMoves = genForwardMoves radius (a, b)
---       whiteBackwardMoves = genBackwardMoves radius (a, b)
---   in if color == White
---      then [whiteForwardMoves, whiteBackwardMoves]
---      else [whiteBackwardMoves, whiteForwardMoves]
+backwardPositions :: Int -> BoardPosition -> Diagonals [BoardPosition]
+backwardPositions radius (a, b) =
+  let diagMovesBackward = diagonalPositions (a, b) radius (+)
+  in Diagonals {left = diagMovesBackward (-),
+                right = diagMovesBackward (+)}
 
--- getLongestMoves :: Board t => t -> BoardPosition -> Figure ->
---                      [[[BoardPosition]]]
--- getLongestMoves board pos (color, figure) =
---   let radius = if figure == Pawn then 2 else (size board)
---       moves = genSpectralMoves radius color pos
---   in mapDirectedPos moves map (\col -> filter (isPosInBoard board) col)
+neighborhood :: Board t => t -> BoardPosition -> Int ->
+                Maybe (Neighborhood [BoardField])
+neighborhood board pos radius =
+  let toFields = fmap $ getFields board
+  in do
+    originFigure <- getFigure board pos
+    return $ Neighborhood {origin = originFigure,
+                           forward = toFields (forwardPositions radius pos),
+                           backward = toFields (backwardPositions radius pos)}
 
--- -----------------------------------------------------------------------------
--- Functions applying to ,,directed positions''
--- first dimension: vertical direction
--- second dimension: horizontal direction
--- third dimension: moves
+orientNeighborhood :: Neighborhood a -> Neighborhood a
+orientNeighborhood (Neighborhood (BoardFigure p (Figure Black fg)) fw bw) =
+  Neighborhood (BoardFigure p (Figure Black fg)) bw fw
+orientNeighborhood n = n
 
-type BoardFigure = (BoardPosition, Figure)
-
--- FIXME: write type
-mapDirectedPos pos rowFunc f =
-  rowFunc (\row -> map f row) pos
-
--- returns distance to closest position
--- FIXME: should check, if position is valid (spectral)
 closestPosDist :: BoardPosition -> [BoardPosition] -> Maybe Int
-closestPosDist orig positions = do
-  dist <- mapM (getDistance orig) positions
-  return (minimum dist)
+closestPosDist orig positions =
+  let distances = mapMaybe (getDistance orig) positions
+  in if null distances then Nothing else Just (minimum distances)
 
--- filters out fields more distant than specified
-constrainDist :: BoardPosition -> [BoardField] -> Int -> [BoardField]
-constrainDist refPos posList dist =
-  filter (\(pos, _) -> (getDistance refPos pos) < Just dist) posList
+constrainDist :: BoardChunk c => (Maybe Int -> Maybe Int -> Bool) ->
+                 BoardPosition -> [c] -> Int -> [c]
+constrainDist f refPos posList dist =
+  filter (\chunk -> (getDistance refPos (pos chunk)) `f` Just dist) posList
 
--- filters out fields blocked by out allies, as we can't jump over them
-allyBlockedMoves :: BoardFigure -> [BoardField] -> [BoardField]
-allyBlockedMoves (origPos, origFig) fields =
-  let fieldAllied (_, Field fig) = maybe False (isAlliedFigure origFig) fig
-      alliedFields = filter fieldAllied fields
-      alliedPos = fst $ unzip alliedFields
-      closestAllyDist = closestPosDist origPos alliedPos
-      validMoves = filter (\(pos, _) -> isSpectralMove origPos pos) fields
-  in maybe validMoves (constrainDist origPos validMoves) closestAllyDist
+constrainMinDist :: BoardChunk c => BoardPosition -> [c] -> Int -> [c]
+constrainMinDist = constrainDist (>)
 
---
+constrainMaxDist :: BoardChunk c => BoardPosition -> [c] -> Int -> [c]
+constrainMaxDist = constrainDist (<)
 
--- closestFigureDist :: BoardPosition -> [BoardFigure] -> Maybe Int
--- closestFigureDist pos neighbors =
---   let dist = map (\(neighPos, _) -> getDistance pos neighPos) neighbors
---   in if null dist then Nothing else minimum dist
+closestChunk :: BoardChunk c => BoardPosition -> [c] -> Maybe (c, Int)
+closestChunk orig fields =
+  let positions = map pos fields
+  in do
+    dist <- closestPosDist orig positions
+    return $ (head $ constrainMaxDist orig fields (dist + 1), dist)
+
+closestFigure :: BoardPosition -> [BoardField] -> Maybe (BoardFigure, Int)
+closestFigure p fields =
+  closestChunk p (filterOccupied fields)
+
+captureMoves :: BoardFigure -> [BoardField] -> [BoardField]
+captureMoves (BoardFigure origPos origFig) fields =
+  let
+    res = do
+      (BoardFigure clPos clFig, dist) <- closestFigure origPos fields
+      gotEnemy <- if isEnemy origFig clFig then pure True else Nothing
+      distantFields <- pure $ constrainMinDist origPos fields dist
+      (_, nextDist) <- closestFigure clPos distantFields
+      finalFields <- pure $ constrainMaxDist clPos distantFields nextDist
+      return $ if gotEnemy then Just finalFields else Nothing
+  in maybe [] fromJust res
+
+nonCaptureMoves :: BoardFigure -> [BoardField] -> [BoardField]
+nonCaptureMoves (BoardFigure origPos _) fields =
+  let closest = closestFigure origPos fields
+  in maybe fields (\(_, dist) -> constrainMaxDist origPos fields dist) closest
+
+-- FIXME: lol, just implement Foldable instance
+notCapturing :: Neighborhood [BoardField] -> Bool
+notCapturing neigh =
+  foldr (&&) True [null $ (left . forward) neigh,
+                   null $ (right . forward) neigh,
+                   null $ (left . backward) neigh,
+                   null $ (right . backward) neigh]
+
+forwardNeighborhood :: Neighborhood [n] -> Neighborhood [n]
+forwardNeighborhood neigh =
+  Neighborhood {origin = origin neigh,
+                forward = forward neigh,
+                backward = Diagonals [] []}
+
+-- Removes illegal moves for non-capturing pawns: backward moves and steps
+-- with distance larger than one.
+nonCapFigCase :: FigureType -> Neighborhood [BoardField] ->
+                 Neighborhood [BoardField]
+nonCapFigCase Pawn n =
+  let p = (pos . origin) n
+  in forwardNeighborhood (fmap (\z -> constrainMaxDist p z 2) n)
+nonCapFigCase King n = n
+
+getMoves :: Board t => t -> BoardPosition -> Maybe (Neighborhood [BoardField])
+getMoves board orig =
+  do
+    bf <- getFigure board orig
+    (Figure _ ft) <- pure $ figure bf
+    range <- pure $ figureRange board ft
+    neighbors <- orientNeighborhood <$> neighborhood board orig range
+    captures <- pure $ captureMoves bf <$> neighbors
+    nonCaptures <- pure $ nonCaptureMoves bf <$> neighbors
+    allowedNonCaptures <- pure $ nonCapFigCase ft nonCaptures
+    return $ if notCapturing captures then allowedNonCaptures else captures

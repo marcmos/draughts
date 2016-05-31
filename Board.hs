@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
-module Board (BoardPosition, BoardField, Board (..), isPosInBoard,
-              removeFigure, getDistance, showBoard) where
+module Board
+where
+
 import Data.Maybe
 
 import Field
@@ -11,15 +12,35 @@ type BoardColumn = Int
 type BoardRow = Int
 type BoardPosition = (BoardRow, BoardColumn)
 
-type BoardField = (BoardPosition, Field)
+class BoardChunk c where
+  pos :: c -> BoardPosition
+
+data BoardField = BoardField BoardPosition Field deriving Show
+data BoardFigure = BoardFigure BoardPosition Figure deriving Show
+
+figure :: BoardFigure -> Figure
+figure (BoardFigure _ fig) = fig
+
+instance BoardChunk BoardField where
+  pos (BoardField p _) = p
+
+instance BoardChunk BoardFigure where
+  pos (BoardFigure p _) = p
+
+fromBoardField :: BoardField -> Maybe BoardFigure
+fromBoardField (BoardField p (Field maybeFigure)) = do
+  f <- maybeFigure
+  return $ BoardFigure p f
 
 class Board a where
   size :: a -> Int
-  getField :: a -> BoardPosition -> Maybe Field
+  getField :: a -> BoardPosition -> Maybe BoardField
+  getFigure :: a -> BoardPosition -> Maybe BoardFigure
   setFigure :: a -> BoardPosition -> Maybe Figure -> Maybe a
   readBoard :: String -> a
   showLines :: a -> [String]
   moveFigure :: a -> BoardPosition -> BoardPosition -> Maybe a
+  remapPos :: a -> BoardPosition -> Maybe BoardPosition
 
 isPosInBoard :: Board a => a -> BoardPosition -> Bool
 isPosInBoard board (row, col) =
@@ -39,12 +60,24 @@ getDistance (fstRow, fstCol) (sndRow, sndCol) =
       colDist = abs $ fstCol - sndCol
   in if rowDist == colDist then Just rowDist else Nothing
 
+getFields :: Board a => a -> [BoardPosition] -> [BoardField]
+getFields board posList =
+  mapMaybe (getField board) posList
+
+filterOccupied :: [BoardField] -> [BoardFigure]
+filterOccupied =
+  mapMaybe fromBoardField
+
 instance Board [[Field]] where
   size a = length a
 
-  getField board pos = do
-    (col, row) <- remapPos board pos
-    return (board !! col !! row)
+  getField board pos =
+    (\(row, col) -> BoardField pos (board !! row !! col)) <$> remapPos board pos
+
+  getFigure board pos = do
+    (BoardField _ field) <- getField board pos
+    fig <- fieldFigure field
+    return $ BoardFigure pos fig
 
   setFigure board pos figure = do
     (row, col) <- remapPos board pos
@@ -59,10 +92,19 @@ instance Board [[Field]] where
        (showBoardLine (prepend padChar)) board
 
   moveFigure board initPos finalPos = do
-    Field figure <- getField board initPos
-    board1 <- setFigure board finalPos figure
+    (BoardFigure _ fig) <- getFigure board initPos
+    board1 <- setFigure board finalPos (Just fig)
     board2 <- removeFigure board1 initPos
     return board2
+
+  remapPos board (row, col) =
+    let mappedRow = row - 1
+        mappedCol = if odd row then col `quot` 2 - 1 else col `quot` 2
+        mappedPos = (mappedRow, mappedCol)
+    in if isPosInBoard board (row, col)
+       then Just mappedPos
+       else Nothing
+
 
 readBoardLine :: (Int -> Bool) -> String -> [Field]
 readBoardLine parity str =
@@ -71,15 +113,6 @@ readBoardLine parity str =
 showBoardLine :: (Char -> String) -> [Field] -> String
 showBoardLine pad line =
   concat (map (pad . showField) line)
-
-remapPos :: [[Field]] -> BoardPosition -> Maybe BoardPosition
-remapPos board (row, col) =
-  let mappedRow = row - 1
-      mappedCol = if odd row then col `quot` 2 - 1 else col `quot` 2
-      mappedPos = (mappedRow, mappedCol)
-  in if isPosInBoard board (row, col)
-     then Just mappedPos
-     else Nothing
 
 -- BoardPosition generator
 -- genPos rows = [(c, d) | c <- [1..8], d <- rows, or [and [even c, even d],
