@@ -6,7 +6,9 @@ import Field
 -- for interactive use
 import Figure
 import PrettyBoard
---import Move
+import Move
+--import GameTree
+import Data.Maybe
 
 exampleBoardStr :: String
 exampleBoardStr = unlines

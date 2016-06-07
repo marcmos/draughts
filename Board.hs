@@ -15,11 +15,16 @@ type BoardPosition = (BoardRow, BoardColumn)
 class BoardChunk c where
   pos :: c -> BoardPosition
 
-data BoardField = BoardField BoardPosition Field deriving Show
-data BoardFigure = BoardFigure BoardPosition Figure deriving Show
+-- FIXME: we assume, that BoardPosition is already validated,
+-- but it is not implemented... for BoardChunk so too
+data BoardField = BoardField BoardPosition Field deriving (Eq, Show)
+data BoardFigure = BoardFigure BoardPosition Figure deriving (Eq, Show)
 
 figure :: BoardFigure -> Figure
 figure (BoardFigure _ fig) = fig
+
+figureType :: BoardFigure -> FigureType
+figureType (BoardFigure _ (Figure _ t)) = t
 
 instance BoardChunk BoardField where
   pos (BoardField p _) = p
@@ -53,12 +58,6 @@ removeFigure = (\board pos -> setFigure board pos Nothing)
 
 showBoard :: Board a => a -> String
 showBoard board = (unlines . showLines) board
-
-getDistance :: BoardPosition -> BoardPosition -> Maybe Int
-getDistance (fstRow, fstCol) (sndRow, sndCol) =
-  let rowDist = abs $ fstRow - sndRow
-      colDist = abs $ fstCol - sndCol
-  in if rowDist == colDist then Just rowDist else Nothing
 
 getFields :: Board a => a -> [BoardPosition] -> [BoardField]
 getFields board posList =
