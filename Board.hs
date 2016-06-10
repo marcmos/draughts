@@ -3,14 +3,14 @@ module Board
 where
 
 import Data.Maybe
+import Data.List
+import Data.Foldable
 
 import Field
 import Figure
 import Utils
 
-type BoardColumn = Int
-type BoardRow = Int
-type BoardPosition = (BoardRow, BoardColumn)
+type BoardPosition = Int
 
 class BoardChunk c where
   pos :: c -> BoardPosition
@@ -26,6 +26,9 @@ figure (BoardFigure _ fig) = fig
 figureType :: BoardFigure -> FigureType
 figureType (BoardFigure _ (Figure _ t)) = t
 
+figureColor :: BoardFigure -> FigureColor
+figureColor (BoardFigure _ (Figure c _)) = c
+
 instance BoardChunk BoardField where
   pos (BoardField p _) = p
 
@@ -37,82 +40,78 @@ fromBoardField (BoardField p (Field maybeFigure)) = do
   f <- maybeFigure
   return $ BoardFigure p f
 
-class Board a where
-  size :: a -> Int
-  getField :: a -> BoardPosition -> Maybe BoardField
-  getFigure :: a -> BoardPosition -> Maybe BoardFigure
-  setFigure :: a -> BoardPosition -> Maybe Figure -> Maybe a
-  readBoard :: String -> a
-  showLines :: a -> [String]
-  moveFigure :: a -> BoardPosition -> BoardPosition -> Maybe a
-  remapPos :: a -> BoardPosition -> Maybe BoardPosition
+class (Functor a, Foldable a) => Board a where
+  size :: a BoardField -> Int
+  getField :: a BoardField -> BoardPosition -> Maybe BoardField
+  getFigure :: a BoardField -> BoardPosition -> Maybe BoardFigure
+  setFigure :: a BoardField -> BoardPosition -> Maybe Figure ->
+               Maybe (a BoardField)
+  readBoard :: String -> a BoardField
+  showLines :: a BoardField -> [String]
+  moveFigure :: a BoardField -> BoardPosition -> BoardPosition ->
+                Maybe (a BoardField)
 
-isPosInBoard :: Board a => a -> BoardPosition -> Bool
-isPosInBoard board (row, col) =
-    row > 0 && row <= (size board) &&
-    col > 0 && col <= (size board) &&
-    odd row /= odd col
-
-removeFigure :: Board a => a -> BoardPosition -> Maybe a
+removeFigure :: Board a => a BoardField -> BoardPosition -> Maybe (a BoardField)
 removeFigure = (\board pos -> setFigure board pos Nothing)
 
-showBoard :: Board a => a -> String
+showBoard :: Board a => a BoardField -> String
 showBoard board = (unlines . showLines) board
 
-getFields :: Board a => a -> [BoardPosition] -> [BoardField]
+getFields :: Board a => a BoardField -> [BoardPosition] -> [BoardField]
 getFields board posList =
   mapMaybe (getField board) posList
 
-filterOccupied :: [BoardField] -> [BoardFigure]
+filterOccupied :: Board a => a BoardField -> [BoardFigure]
 filterOccupied =
-  mapMaybe fromBoardField
+  (mapMaybe fromBoardField) . toList
 
-instance Board [[Field]] where
-  size a = length a
+-- -----------------------------------------------------------------------------
+-- Board list implementation
+instance Board [] where
+  size = floor . sqrt . fromIntegral . (* 2) . length
 
-  getField board pos =
-    (\(row, col) -> BoardField pos (board !! row !! col)) <$> remapPos board pos
+  getField board p =
+    (!!) board <$> remapPos board p
 
   getFigure board pos = do
     (BoardField _ field) <- getField board pos
     fig <- fieldFigure field
     return $ BoardFigure pos fig
 
-  setFigure board pos figure = do
-    (row, col) <- remapPos board pos
-    return (replaceNth row board (replaceNth col (board !! row) (Field figure)))
+  setFigure board pos figure =
+    replaceNth board (BoardField pos (Field figure)) <$> remapPos board pos
 
-  readBoard s = mapOddEven (readBoardLine odd) (readBoardLine even) (lines s)
+  readBoard s = concat $ zipWith (readBoardLine size) [0..] rows
+    where rows = lines s
+          size = length rows
 
   showLines board =
-    let padChar = '.'
-    in mapOddEven
-       (showBoardLine (append padChar))
-       (showBoardLine (prepend padChar)) board
+    let rawChars = splitEvery (size board `quot` 2) $ map showBoardField board
+        padChar = showField (Field Nothing)
+        delimitedChars = map (intersperse padChar) rawChars
+    in mapOddEven (append padChar) (prepend padChar) delimitedChars
 
   moveFigure board initPos finalPos = do
     (BoardFigure _ fig) <- getFigure board initPos
-    board1 <- setFigure board finalPos (Just fig)
-    board2 <- removeFigure board1 initPos
-    return board2
+    board <- setFigure board finalPos (Just fig)
+    removeFigure board initPos
 
-  remapPos board (row, col) =
-    let mappedRow = row - 1
-        mappedCol = if odd row then col `quot` 2 - 1 else col `quot` 2
-        mappedPos = (mappedRow, mappedCol)
-    in if isPosInBoard board (row, col)
-       then Just mappedPos
-       else Nothing
+showBoardField :: BoardField -> Char
+showBoardField (BoardField _ f) = showField f
 
+remapPos :: [BoardField] -> BoardPosition -> Maybe Int
+remapPos b p =
+  if mappedPos < 0 || mappedPos >= (size b) ^ 2 then Nothing else Just mappedPos
+  where mappedPos = p - 1
 
-readBoardLine :: (Int -> Bool) -> String -> [Field]
-readBoardLine parity str =
-  map readField (every parity str)
+readBoardLine :: Int -> Int -> String -> [BoardField]
+readBoardLine bsize line str =
+  zipWith constructField [0..] fields
+  where
+    calcPos p = (bsize `quot` 2) * line + p + 1
+    constructField offset field = BoardField (calcPos offset) field
+    fields = map readField $ every (if odd line then odd else even) str
 
-showBoardLine :: (Char -> String) -> [Field] -> String
-showBoardLine pad line =
-  concat (map (pad . showField) line)
-
--- BoardPosition generator
--- genPos rows = [(c, d) | c <- [1..8], d <- rows, or [and [even c, even d],
---                                                     and [odd c, odd d]]]
+-- showBoardLine :: (Char -> String) -> [Field] -> String
+-- showBoardLine pad line =
+--   concat (map (pad . showField) line)

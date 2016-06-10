@@ -26,3 +26,7 @@ isEnemy (Figure color _) (Figure oppColor _) = color /= oppColor
 isPawn :: Figure -> Bool
 isPawn (Figure _ Pawn) = True
 isPawn _ = False
+
+oppositeColor :: FigureColor -> FigureColor
+oppositeColor White = Black
+oppositeColor Black = White

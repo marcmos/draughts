@@ -5,10 +5,11 @@ import Field
 
 -- for interactive use
 import Figure
-import PrettyBoard
+--import PrettyBoard
 import Move
---import GameTree
+import GameTree
 import Data.Maybe
+import Control.Monad
 
 exampleBoardStr :: String
 exampleBoardStr = unlines
@@ -21,12 +22,28 @@ exampleBoardStr = unlines
    ".w.w.w.w",
    "w.w.w.w."]
 
-readListBoard :: Board [[Field]] => String -> [[Field]]
+readListBoard :: Board [] => String -> [BoardField]
 readListBoard = readBoard
 
-exampleBoard :: [[Field]]
+exampleBoard :: [BoardField]
 exampleBoard = readListBoard exampleBoardStr
 
+startTurn :: [BoardField] -> Turn
+startTurn = Turn White
+
+showTurn :: Turn -> IO ()
+showTurn (Turn c b) = do
+  putStr . showBoard $ b
+  putStrLn $ show c ++ " moves"
+
+play :: Turn -> IO Turn
+play t = do
+  showTurn t
+  _ <- getChar
+  nt <- pure $ evalTurn 3 t
+  play nt
+
 main :: IO ()
-main =
+main = do
+  _ <- play $ startTurn exampleBoard
   return ()
