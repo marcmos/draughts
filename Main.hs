@@ -10,6 +10,7 @@ import Move
 import GameTree
 import Data.Maybe
 import Control.Monad
+import Data.Tree
 
 exampleBoardStr :: String
 exampleBoardStr = unlines
@@ -40,7 +41,7 @@ play :: Turn -> IO Turn
 play t = do
   showTurn t
   _ <- getChar
-  nt <- pure $ evalTurn 3 t
+  nt <- pure $ evalTurn 4 t
   play nt
 
 main :: IO ()
