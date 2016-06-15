@@ -18,7 +18,6 @@ figureRange board King = size board
 
 -- -----------------------------------------------------------------------------
 -- Stepping
-
 data Step = Step BoardFigure [BoardPosition] deriving Show
 data FigureCtx t = FigureCtx BoardFigure (t BoardField)
 data StepEnv t = StepEnv Step (t BoardField)
@@ -78,7 +77,6 @@ landFigCtx (StepEnv (Step (BoardFigure srcPos f) landPosList) b) =
           return $ FigureCtx (BoardFigure dstPos f) newBoard
 
 -- Step path generation
--- FIXME: handle king transformation
 stepPaths :: Board b => FigureCtx b -> [Path b]
 stepPaths (FigureCtx bf b) =
   maybe [] (map buildPath) landingCtxs
@@ -86,4 +84,5 @@ stepPaths (FigureCtx bf b) =
         nbr = neighborhood b bf $ figureRange b ft
         stepEnv = (flip StepEnv b) <$> step b nbr
         landingCtxs = landFigCtx <$> stepEnv
-        buildPath (FigureCtx landBF landB) = MoveStep (pos bf) (pos landBF) landB
+        buildPath (FigureCtx landBF landB) = MoveStep (pos bf) (pos landBF)
+          landB

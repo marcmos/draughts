@@ -16,6 +16,7 @@ import Step
 data Capture = Capture Step BoardFigure
 data CaptureEnv b = CaptureEnv (StepEnv b) BoardFigure deriving Show
 
+--------------------------------------------------------------------------------
 -- Diagonal jumps
 diagJump :: Board b => FigureCtx b -> [BoardField] ->
         Maybe (BoardFigure, [BoardPosition])
@@ -36,6 +37,7 @@ diagCapture fc fs =
     return $ Capture (Step bf ls) jf
   where (FigureCtx bf _) = fc
 
+--------------------------------------------------------------------------------
 -- Capture evaluation
 figCaptures :: Board b => FigureCtx b -> [Capture]
 figCaptures fc =
@@ -53,6 +55,7 @@ evalCapture (CaptureEnv se cf) =
   maybe [] (landFigCtx . StepEnv s) (setFigure b (pos cf) Nothing)
   where (StepEnv s b) = se
 
+--------------------------------------------------------------------------------
 -- Capture tree
 data CaptureTree b = CaptureTree (FigureCtx b) (Forest (FigureCtx b))
   deriving Show
@@ -67,6 +70,7 @@ captureTree :: Board b => FigureCtx b -> CaptureTree b
 captureTree fc =
   CaptureTree fc $ unfoldForest expandNode $ childCtx fc
 
+--------------------------------------------------------------------------------
 -- Path build
 leafPaths :: Board b => Tree (FigureCtx b) -> [[FigureCtx b]]
 leafPaths tree =

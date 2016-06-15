@@ -1,5 +1,4 @@
-module GameTree
-where
+module GameTree where
 
 import Data.Tree
 import Data.List
