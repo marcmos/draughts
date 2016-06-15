@@ -10,43 +10,6 @@ import Field
 import Move
 import Figure
 
--- Move evaluation
-replacePos :: FigureType -> BoardField -> [BoardPosition] -> BoardField
-replacePos _ (BoardField p (Field Nothing)) _ = BoardField p (Field Nothing)
-replacePos ft bf posL =
-  if elem p posL then BoardField p (Field $ Just $ Figure c ft) else bf
-  where (BoardField p (Field (Just (Figure c _)))) = bf
-
-transformKings :: Board t => t BoardField -> t BoardField
-transformKings b =
-  transform <$> b
-  where
-    transform bf = case bf of
-      BoardField _ (Field (Just (Figure White Pawn))) ->
-        replacePos King bf whiteFields
-      BoardField _ (Field (Just (Figure Black Pawn))) ->
-        replacePos King bf blackFields
-      _ -> bf
-    rowFields = size b `quot` 2
-    whiteFields = [1..rowFields]
-    blackFields = [((size b - 1) * rowFields + 1)..(size b * rowFields)]
-
-evalStep :: Board t => t BoardField -> Step -> [t BoardField]
-evalStep b (Step bf fs) =
-  transformKings <$> mapMaybe ((moveFigure b (pos bf)) . pos) fs
-
-evalCapture :: Board t => t BoardField -> Capture -> [t BoardField]
-evalCapture b (Capture s cf) =
-  transformKings <$> maybe [] (\eb -> evalStep eb s)
-  (setFigure b (pos cf) Nothing)
-
-evalCaptures :: Board t => t BoardField -> [Capture] -> [t BoardField]
-evalCaptures b cs =
-  concat $ map (evalCapture b) cs
-
-evalMove :: Board t => t BoardField -> Move -> [t BoardField]
-evalMove b m =
-  either (evalCaptures b) (evalStep b) m
 
 -- -----------------------------------------------------------------------------
 data Turn = Turn FigureColor [BoardField] deriving Show

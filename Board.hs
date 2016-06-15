@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
-module Board
-where
+module Board where
 
 import Data.Maybe
 import Data.List
@@ -111,6 +110,7 @@ readBoardLine bsize line str =
     calcPos p = (bsize `quot` 2) * line + p + 1
     constructField offset field = BoardField (calcPos offset) field
     fields = map readField $ every (if odd line then odd else even) str
+
 
 -- showBoardLine :: (Char -> String) -> [Field] -> String
 -- showBoardLine pad line =
