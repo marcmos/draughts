@@ -15,8 +15,6 @@ import Step
 
 data Capture = Capture Step BoardFigure
 data CaptureEnv b = CaptureEnv (StepEnv b) BoardFigure deriving Show
-data CaptureTree b = CaptureTree (FigureCtx b) (Forest (CaptureEnv b))
-  deriving Show
 
 -- Diagonal jumps
 diagJump :: Board b => FigureCtx b -> [BoardField] ->
@@ -56,12 +54,38 @@ evalCapture (CaptureEnv se cf) =
   where (StepEnv s b) = se
 
 -- Capture tree
-childCaptures :: Board b => CaptureEnv b -> [CaptureEnv b]
-childCaptures =
-  concat . map stepCaptures . evalCapture
+data CaptureTree b = CaptureTree (FigureCtx b) (Forest (FigureCtx b))
+  deriving Show
 
-expandCT :: Board b => CaptureEnv b -> (CaptureEnv b, [CaptureEnv b])
-expandCT ce = (ce, childCaptures ce)
+childCtx :: Board b => FigureCtx b -> [FigureCtx b]
+childCtx = concat . map evalCapture . stepCaptures
+
+expandNode :: Board b => FigureCtx b -> (FigureCtx b, [FigureCtx b])
+expandNode fc = (fc, childCtx fc)
 
 captureTree :: Board b => FigureCtx b -> CaptureTree b
-captureTree se = CaptureTree se $ unfoldForest expandCT $ stepCaptures se
+captureTree fc =
+  CaptureTree fc $ unfoldForest expandNode $ childCtx fc
+
+-- Path build
+leafPaths :: Board b => Tree (FigureCtx b) -> [[FigureCtx b]]
+leafPaths tree =
+  map reverse $ traverse [] tree
+  where
+    traverse path (Node fc []) = [fc:path]
+    traverse path (Node fc xs) = concat $ map (traverse (fc:path)) xs
+
+landing :: Board b => [FigureCtx b] ->
+           ([BoardPosition], BoardPosition, b BoardField)
+landing middles =
+  (init middlesPosList, pos landBF, landB)
+  where middlesPosList = (\(FigureCtx middle _) -> pos middle) <$> middles
+        (FigureCtx landBF landB) = last middles
+
+capturePaths :: Board b => FigureCtx b -> [Path b]
+capturePaths fc =
+  map (buildCapture . landing) . treeLandings . captureTree $ fc
+  where (FigureCtx bf _) = fc
+        buildCapture (middles, landPos, landBoard) = MoveCapture (pos bf)
+          middles landPos landBoard
+        treeLandings (CaptureTree _ f) = concat $ leafPaths <$> f

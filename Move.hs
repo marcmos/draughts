@@ -11,7 +11,7 @@ import Step
 import Capture
 
 --type CaptureSeq = [Capture]
-data Move t = Either [CaptureSeq] Step
+--data Move t = Either [CaptureSeq] Step
 
 -- moves :: Board t => t BoardField -> BoardFigure -> Maybe Move
 -- moves b bf

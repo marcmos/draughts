@@ -33,7 +33,8 @@ instance Show (StepEnv t) where
   show (StepEnv s _) = "StepEnv (" ++ show s ++ ") *board*"
 instance Show (Path t) where
   show (MoveStep p1 p2 _) = "MoveStep (" ++ show p1 ++ ") (" ++ show p2 ++ ") *board*"
-  show _ = undefined
+  show (MoveCapture sp m ep _) = "MoveCapture (" ++ show sp ++ ") (" ++
+    show m ++ ") (" ++ show ep ++ ") *board*"
 
 -- -----------------------------------------------------------------------------
 stepMoves :: Board b => b BoardField -> BoardFigure -> [BoardField] ->
@@ -74,10 +75,9 @@ landFigCtx (StepEnv (Step (BoardFigure srcPos f) landPosList) b) =
           return $ FigureCtx (BoardFigure dstPos f) newBoard
 
 -- Step path generation
-
 -- FIXME: handle king transformation
-steps :: Board b => FigureCtx b -> [Path b]
-steps (FigureCtx bf b) =
+stepPaths :: Board b => FigureCtx b -> [Path b]
+stepPaths (FigureCtx bf b) =
   maybe [] (map buildPath) landingCtxs
   where (BoardFigure _ (Figure _ ft)) = bf
         nbr = neighborhood b bf $ figureRange b ft
