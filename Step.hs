@@ -3,6 +3,7 @@ module Step where
 
 import Data.Foldable (toList)
 import Data.Maybe (mapMaybe)
+import Data.List (intersperse)
 
 import Board
 import BoardChunk
@@ -32,9 +33,11 @@ instance Show (FigureCtx t) where
 instance Show (StepEnv t) where
   show (StepEnv s _) = "StepEnv (" ++ show s ++ ") *board*"
 instance Show (Path t) where
-  show (MoveStep p1 p2 _) = "MoveStep (" ++ show p1 ++ ") (" ++ show p2 ++ ") *board*"
-  show (MoveCapture sp m ep _) = "MoveCapture (" ++ show sp ++ ") (" ++
-    show m ++ ") (" ++ show ep ++ ") *board*"
+  show (MoveStep p1 p2 _) = show p1 ++ "-" ++ show p2
+  show (MoveCapture sp [] ep _) = show sp ++ "x" ++ show ep
+  show (MoveCapture sp m ep _) = show sp ++ "x" ++ delimited ++ "x" ++ show ep
+    where delimited = concat . intersperse "x" $ map show m
+
 
 -- -----------------------------------------------------------------------------
 stepMoves :: Board b => b BoardField -> BoardFigure -> [BoardField] ->

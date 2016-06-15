@@ -1,16 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Main where
-import Board
-import Field
 
--- for interactive use
+import Board
 import Figure
---import PrettyBoard
-import Move
 import GameTree
-import Data.Maybe
-import Control.Monad
-import Data.Tree
 
 exampleBoardStr :: String
 exampleBoardStr = unlines
@@ -29,19 +22,20 @@ readListBoard = readBoard
 exampleBoard :: [BoardField]
 exampleBoard = readListBoard exampleBoardStr
 
-startTurn :: [BoardField] -> Turn
-startTurn = Turn White
+startTurn :: b BoardField -> Turn b
+startTurn = \x -> Turn White x Nothing
 
-showTurn :: Turn -> IO ()
-showTurn (Turn c b) = do
+showTurn :: Board b => Turn b -> IO ()
+showTurn (Turn c b path) = do
   putStr . showBoard $ b
+  putStrLn $ maybe "*unknown move* (initial board?)" show path
   putStrLn $ show c ++ " moves"
 
-play :: Turn -> IO Turn
+play :: Board b => Turn b -> IO (Turn b)
 play t = do
   showTurn t
   _ <- getChar
-  nt <- pure $ evalTurn 4 t
+  nt <- pure $ evalTurn 5 t
   play nt
 
 main :: IO ()
